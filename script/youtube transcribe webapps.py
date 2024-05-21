@@ -215,25 +215,49 @@ def query_sentence_window_rag(query, sentence_index, top_k=2):
   return window_response.response
 
 
+import gradio as gr
 
-
-
-if __name__ == "__main__":
-
-  url = "https://www.youtube.com/watch?v=rZvhFcA-n5c&ab_channel=SNARLED"
-  q = "summarize the video"
-  
+def greet(query, url, api):
   path = "transcript.txt"
-  _ = load_dotenv(find_dotenv())
-  api_key = os.getenv("OPENAI_API_KEY")
-  
-  
-  tr = get_transcript(url)
 
+  tr = get_transcript(url)
   with open(path, "w") as file:
     file.write(tr["text"])
 
+  sent_index = get_sentence_index(api_key=api, file_path=path)
+  answer = query_sentence_window_rag(query=query, sentence_index=sent_index)
   
-  sent_index = get_sentence_index(api_key=api_key, file_path=path)
-  answer = query_sentence_window_rag(query=q, sentence_index=sent_index)
-  print(answer)
+
+  return answer
+
+demo = gr.Interface(
+    fn=greet,
+    inputs=["text", "text", "text"],
+    outputs=["text"],
+    allow_flagging=False,
+)
+demo.launch()
+
+
+
+
+
+# if __name__ == "__main__":
+
+#   url = "https://www.youtube.com/watch?v=rZvhFcA-n5c&ab_channel=SNARLED"
+#   q = "summarize the video"
+  
+  
+#   _ = load_dotenv(find_dotenv())
+#   api_key = os.getenv("OPENAI_API_KEY")
+  
+  
+#   tr = get_transcript(url)
+
+#   with open(path, "w") as file:
+#     file.write(tr["text"])
+
+  
+#   sent_index = get_sentence_index(api_key=api_key, file_path=path)
+#   answer = query_sentence_window_rag(query=q, sentence_index=sent_index)
+#   print(answer)
