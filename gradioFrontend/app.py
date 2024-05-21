@@ -234,6 +234,7 @@ demo = gr.Interface(
     fn=greet,
     inputs=["text", "text", "text"],
     outputs=["text"],
+)
 
 demo.launch()
 
