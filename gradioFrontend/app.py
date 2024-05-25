@@ -15,6 +15,8 @@ from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.postprocessor import MetadataReplacementPostProcessor
 from llama_index.core.node_parser import SentenceWindowNodeParser
+import gradio as gr
+
 import warnings 
 warnings.filterwarnings("ignore")
 
@@ -65,7 +67,7 @@ def get_video_id(url: str) -> str:
         str: _description_
     """
     # [TODO]: try and raise error
-    return re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url).group(1)
+    return re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)[1]
 
 
 def check_existing_transcript(url: str, language_code="en", manual_only=True, output_timestamp=False) -> Union[str, bool]:
@@ -99,14 +101,14 @@ def check_existing_transcript(url: str, language_code="en", manual_only=True, ou
   
   if language_code in transcript_list and transcript_list[language_code] is manual_only:
     transcription_ = YouTubeTranscriptApi.get_transcript(video_id, languages=[language_code])
+    transcript = ""
+    
     if output_timestamp:
-      transcript = ""
       for tr in transcription_:
         start = time.strftime("%H:%M:%S", time.gmtime(tr["start"]))
         end = time.strftime("%H:%M:%S", time.gmtime(tr["start"]))
         transcript += f"[{start}-{end}] {tr['text']}" + "\n"
     else:
-      transcript = ""
       for tr in transcription_:
         transcript += tr["text"]+" "
   else:
@@ -168,24 +170,21 @@ def convert_speech_to_text(file, model_size="tiny", language="en", fp16=False, v
       _type_: _description_
   """
   model = whisper.load_model(model_size)
-  result = model.transcribe(file, language=language, fp16=fp16, verbose=verbose)
-  return result
+  return model.transcribe(file, language=language, fp16=fp16, verbose=verbose)
   
-
-
 
 def get_sentence_index(api_key: str, file_path: str) -> str:
   
   openai.api_key = api_key
-  
+
   document = SimpleDirectoryReader(input_files=[file_path]).load_data()[0]
-  
+
   node_parser = SentenceWindowNodeParser.from_defaults(
     window_size=2,
     window_metadata_key="window",
     original_text_metadata_key="original_text"
   )
-  
+
   llm = OpenAI(model="gpt-3.5-turbo", temperature=0)
 
   sentence_context = ServiceContext.from_defaults(
@@ -193,13 +192,9 @@ def get_sentence_index(api_key: str, file_path: str) -> str:
     embed_model=HuggingFaceEmbedding("BAAI/bge-small-en-v1.5"),
     node_parser=node_parser
   )
-  
-  sentence_index = VectorStoreIndex.from_documents(
-    [document],
-    service_context=sentence_context
-  )
-  
-  return sentence_index
+
+  return VectorStoreIndex.from_documents([document],
+                                         service_context=sentence_context)
 
 def query_sentence_window_rag(query, sentence_index, top_k=2):
   
@@ -214,9 +209,6 @@ def query_sentence_window_rag(query, sentence_index, top_k=2):
   
   return window_response.response
 
-
-import gradio as gr
-
 def greet(query, url, api):
   path = "transcript.txt"
 
@@ -225,10 +217,7 @@ def greet(query, url, api):
     file.write(tr["text"])
 
   sent_index = get_sentence_index(api_key=api, file_path=path)
-  answer = query_sentence_window_rag(query=query, sentence_index=sent_index)
-  
-
-  return answer
+  return query_sentence_window_rag(query=query, sentence_index=sent_index)
 
 demo = gr.Interface(
     fn=greet,
@@ -237,27 +226,3 @@ demo = gr.Interface(
 )
 
 demo.launch()
-
-
-
-
-
-# if __name__ == "__main__":
-
-#   url = "https://www.youtube.com/watch?v=rZvhFcA-n5c&ab_channel=SNARLED"
-#   q = "summarize the video"
-  
-  
-#   _ = load_dotenv(find_dotenv())
-#   api_key = os.getenv("OPENAI_API_KEY")
-  
-  
-#   tr = get_transcript(url)
-
-#   with open(path, "w") as file:
-#     file.write(tr["text"])
-
-  
-#   sent_index = get_sentence_index(api_key=api_key, file_path=path)
-#   answer = query_sentence_window_rag(query=q, sentence_index=sent_index)
-#   print(answer)
